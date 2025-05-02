@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farkle Fun - Dice Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <style>
+        /* --- Base Styles --- */
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(to bottom right, #2c3e50, #1a2a3a);
+            color: #ecf0f1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 15px;
+            overflow-x: hidden;
+        }
+        /* --- Game Container --- */
+        .game-container {
+            background-color: rgba(22, 36, 71, 0.85);
+            border: 4px solid #bdc3c7;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 0 5px rgba(44, 62, 80, 0.5);
+            width: 100%;
+            max-width: 850px;
+            text-align: center;
+            position: relative; /* Needed for overlays */
+            box-sizing: border-box;
+        }
+        /* --- Dice Area --- */
+        .dice-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-content: flex-start;
+            gap: 18px;
+            margin: 25px 0;
+            min-height: 160px;
+            perspective: 1000px;
+        }
+        /* --- Individual Die Styling --- */
+        .die {
+            width: 65px; height: 65px; border: none; border-radius: 10px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            background: linear-gradient(145deg, #ffffff, #e6e6e6);
+            box-shadow: 5px 5px 10px #b8b8b8, -5px -5px 10px #ffffff;
+            transition: transform 0.3s ease-out, box-shadow 0.3s ease, background 0.3s ease;
+            position: relative;
+        }
+        .die svg { width: 45px; height: 45px; fill: #34495e; transition: fill 0.3s ease; }
+        .die.selected {
+            background: linear-gradient(145deg, #f7ca70, #f9a826);
+            box-shadow: 3px 3px 6px #d48e20, -3px -3px 6px #ffc22c, inset 1px 1px 3px rgba(0,0,0,0.1);
+            transform: scale(1.08) rotateY(10deg);
+        }
+        .die.selected svg { fill: #fff; }
+        .die.rolling { animation: roll 0.5s ease-out forwards; }
+        @keyframes roll {
+            0% { transform: rotateX(0) rotateY(0) scale(1); }
+            50% { transform: rotateX(180deg) rotateY(180deg) scale(1.1); }
+            100% { transform: rotateX(360deg) rotateY(360deg) scale(1); }
+        }
+        /* --- Button Styling --- */
+        button {
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(to bottom, #3498db, #2980b9); color: #ffffff;
+            border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer;
+            transition: all 0.3s ease; margin: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), inset 0 -2px 3px rgba(0,0,0,0.1);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3); position: relative; overflow: hidden;
+            flex-shrink: 0;
+        }
+        button:hover {
+            background: linear-gradient(to bottom, #4cae4c, #398439);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.25), inset 0 -2px 3px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        button#bank-button:hover { background: linear-gradient(to bottom, #f0ad4e, #ec971f); }
+        button:active { transform: translateY(1px); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2), inset 0 -1px 2px rgba(0,0,0,0.1); }
+        button:disabled {
+            background: linear-gradient(to bottom, #95a5a6, #7f8c8d); color: #bdc3c7;
+            cursor: not-allowed; box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1), inset 0 -1px 2px rgba(0,0,0,0.1);
+            transform: translateY(0);
+        }
+         button i { margin-right: 8px; }
+        /* --- Score Display Area --- */
+        .scores {
+            display: flex; justify-content: space-evenly; flex-wrap: wrap; margin-bottom: 15px;
+            background-color: rgba(0, 0, 0, 0.2); padding: 10px 5px; border-radius: 15px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.4);
+        }
+        .score-section {
+            min-width: 110px; margin: 5px; padding: 8px; border-radius: 10px;
+            background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .score-section div:first-child { font-size: 0.7em; color: #bdc3c7; margin-bottom: 4px; }
+        .score-section div:last-child { font-size: 1.2em; color: #f1c40f; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .score-section.active-player { background-color: rgba(241, 196, 15, 0.1); border-color: rgba(241, 196, 15, 0.3); }
+        /* --- Message Box --- */
+        .message-box {
+            min-height: 3em; margin-top: 15px; padding: 10px; background-color: rgba(0,0,0,0.4);
+            border-radius: 8px; border: 1px solid #7f8c8d; color: #f1c40f; line-height: 1.5;
+            font-size: 0.8em; text-align: center; box-shadow: inset 0 0 8px rgba(0,0,0,0.5);
+            transition: opacity 0.1s ease-in-out;
+        }
+        /* --- Title --- */
+        h1 { color: #ecf0f1; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 10px; }
+        /* --- Goal Display --- */
+        .goal-display { color: #bdc3c7; margin-bottom: 10px; font-size: 0.9em; }
+        .goal-display span { color: #f1c40f; font-size: 1.1em; }
+        /* --- Held Dice Placeholder --- */
+        .held-placeholder { order: -1; font-size: 0.8em; color: #95a5a6; }
+
+        /* --- Credits & Betting --- */
+         .credits-display {
+             display: flex; justify-content: space-around; flex-wrap: wrap; margin-bottom: 15px;
+             padding: 8px; background-color: rgba(0, 0, 0, 0.15); border-radius: 10px;
+             font-size: 0.8em;
+         }
+         .credit-section span { color: #34d399; font-size: 1.1em; margin-left: 5px; }
+
+         /* --- Overlay Base Styles --- */
+         .overlay {
+             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+             background-color: rgba(10, 20, 30, 0.97);
+             border-radius: 20px;
+             display: flex;
+             flex-direction: column;
+             align-items: center;
+             z-index: 10;
+             padding: 20px;
+             color: #ecf0f1;
+             opacity: 1;
+             visibility: visible;
+             transition: opacity 0.3s ease, visibility 0.3s ease;
+             pointer-events: auto;
+             box-sizing: border-box;
+             min-height: 75vh;
+             overflow-y: auto;
+             text-align: center;
+         }
+         .overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+         }
+         .overlay h2 { margin-bottom: 20px; flex-shrink: 0; }
+         .overlay p { margin-bottom: 15px; flex-shrink: 0; }
+         .overlay label { margin-bottom: 8px; display: block; flex-shrink: 0; }
+         .overlay button { margin-top: 15px; flex-shrink: 0; }
+
+         /* --- Betting Overlay Specifics --- */
+         #betting-overlay {
+             justify-content: center;
+         }
+         #betting-overlay input[type="number"],
+         #betting-overlay select {
+             font-family: 'Press Start 2P', cursive; background: #dfe6e9;
+             border: 2px solid #b2bec3; color: #2d3436;
+             padding: 8px; margin-bottom: 20px; border-radius: 5px;
+             text-align: center; flex-shrink: 0;
+            -moz-appearance: textfield; appearance: textfield;
+         }
+          #betting-overlay input[type="number"] { width: 100px; }
+          #betting-overlay select { width: 150px; text-align-last: center; }
+         #betting-overlay input[type="number"]::-webkit-outer-spin-button,
+         #betting-overlay input[type="number"]::-webkit-inner-spin-button {
+             -webkit-appearance: none; margin: 0;
+         }
+
+         /* --- Instructions Overlay Specifics --- */
+         #instructions-overlay {
+             text-align: left;
+             align-items: stretch;
+             justify-content: flex-start;
+             font-size: 0.75em;
+         }
+         #instructions-overlay h2 {
+             width: 100%; text-align: center; margin-bottom: 15px; flex-shrink: 0;
+         }
+         #instructions-overlay .instructions-content {
+             overflow-y: auto; flex-grow: 1; padding-right: 10px; margin-bottom: 15px;
+             width: 100%; box-sizing: border-box;
+         }
+         #instructions-overlay ul { list-style: none; padding: 0; width: 100%; margin-bottom: 10px; }
+         #instructions-overlay ul ul { margin-top: 5px; margin-bottom: 10px; padding-left: 1em; }
+          #instructions-overlay li { margin-bottom: 8px; padding-left: 1.5em; position: relative; }
+         #instructions-overlay li::before { content: '*'; color: #f1c40f; position: absolute; left: 0; top: 0; }
+         #instructions-overlay ul ul li::before { content: '-'; }
+         #instructions-overlay .close-button-container {
+             width: 100%; text-align: center;
+             padding-top: 10px;
+             flex-shrink: 0;
+         }
+
+         /* --- Utility Class --- */
+         .hidden { display: none !important; }
+
+        /* --- Responsive Adjustments --- */
+        @media (max-width: 700px) {
+             .score-section { min-width: 100px; padding: 6px; margin: 4px; }
+             .score-section div:last-child { font-size: 1.1em; }
+             button { padding: 10px 18px; font-size: 0.8em; margin: 5px; }
+             h1 { font-size: 1.3em; }
+             .credits-display { font-size: 0.7em; }
+             #betting-overlay input[type="number"], #betting-overlay select { width: 120px; padding: 6px; }
+             .overlay { padding: 20px 15px; min-height: 80vh; }
+             #instructions-overlay { font-size: 0.7em; }
+        }
+        @media (max-width: 600px) {
+            .game-container { padding: 15px; }
+            .die { width: 55px; height: 55px; }
+            .die svg { width: 35px; height: 35px; }
+            .scores { padding: 10px 5px; }
+            .button-container { display: flex; flex-direction: column; align-items: center; }
+             button { width: 85%; margin-bottom: 10px; }
+             #instructions-overlay { font-size: 0.65em; }
+             .overlay { min-height: 85vh; }
+        }
+         @media (max-width: 450px) {
+            .die { width: 50px; height: 50px; border-radius: 8px; }
+            .dice-container { gap: 12px; }
+            .die svg { width: 30px; height: 30px; }
+            .scores { flex-direction: column; align-items: stretch; padding: 10px; }
+            .score-section { margin-bottom: 8px; text-align: center; }
+            button { width: 90%; padding: 10px; font-size: 0.8em;}
+            h1 { font-size: 1.2em; }
+            .message-box { font-size: 0.75em; }
+            .credits-display { flex-direction: column; align-items: center; }
+            .credit-section { margin-bottom: 5px; }
+            .overlay { padding: 15px 10px; min-height: 90vh; }
+            #instructions-overlay { font-size: 0.6em; }
+         }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+
+        <div id="betting-overlay" class="overlay">
+            <h2>Place Your Bet!</h2>
+            <p>Available Credits: <span id="available-credits">0</span></p>
+            <div>
+                <label for="target-score-select">Target Score:</label>
+                <select id="target-score-select">
+                    <option value="1000">1000</option>
+                    <option value="2000">2000</option>
+                    <option value="5000">5000</option>
+                    <option value="10000" selected>10000</option>
+                </select>
+            </div>
+            <div>
+                <label for="bet-amount">Bet:</label>
+                <input type="number" id="bet-amount" min="10" step="10" value="50">
+            </div>
+             <p id="bet-error" class="text-red-500 text-xs mt-1 mb-2 h-4"></p>
+             <button id="start-game-button"><i class="fas fa-play"></i> Start Game</button>
+             <button id="reset-credits-button" class="text-xs mt-4 !bg-red-600 hover:!bg-red-800"><i class="fas fa-sync-alt"></i> Reset Credits (1000)</button>
+        </div>
+
+        <div id="instructions-overlay" class="overlay hidden">
+             <h2>How to Play Farkle</h2>
+             <div class="instructions-content">
+                 <ul>
+                     <li>Goal: Be the first to reach the target score.</li>
+                     <li>Roll all 6 dice. Select dice that form scoring combinations.</li>
+                     <li>Scoring Dice:
+                         <ul>
+                             <li>Single 1 = 100 pts</li>
+                             <li>Single 5 = 50 pts</li>
+                             <li>Three 1s = 1000 pts</li>
+                             <li>Three 2s = 200 pts</li>
+                             <li>Three 3s = 300 pts</li>
+                             <li>Three 4s = 400 pts</li>
+                             <li>Three 5s = 500 pts</li>
+                             <li>Three 6s = 600 pts</li>
+                             <li>4 of a Kind = 1000 pts</li>
+                             <li>5 of a Kind = 2000 pts</li>
+                             <li>6 of a Kind = 3000 pts</li>
+                             <li>1-6 Straight = 1500 pts</li>
+                             <li>1-5 Straight = 750 pts</li> <li>2-6 Straight = 750 pts</li> <li>Three Pairs = 1500 pts</li>
+                             <li>Two Triplets = 2500 pts</li>
+                         </ul>
+                     </li>
+                     <li>You MUST select at least one scoring die after each roll.</li>
+                     <li>After selecting, you can either:
+                         <ul>
+                             <li>**Bank:** Add round points to total score & end turn. (Any valid score can be banked).</li>
+                             <li>**Roll Again:** Roll remaining dice for more points.</li>
+                         </ul>
+                     </li>
+                     <li>**Farkle:** No scoring dice on a roll? Lose round points & turn ends.</li>
+                     <li>**Hot Dice:** All 6 dice score? Get bonus points & roll all 6 again!</li>
+                 </ul>
+             </div>
+             <div class="close-button-container">
+                <button id="close-instructions-button">Let's Play!</button>
+            </div>
+        </div>
+
+
+        <div id="main-game-area" class="hidden">
+            <h1 class="text-2xl">Farkle Fun!</h1>
+            <div class="goal-display text-lg">Goal: <span id="goal-score">10000</span> Points</div>
+
+            <div class="credits-display">
+                <div class="credit-section">Player Credits: <span id="player-credits">0</span></div>
+                <div class="credit-section">Opponent Credits: <span id="opponent-credits">0</span></div>
+                <div class="credit-section">Current Bet: <span id="current-bet">0</span></div>
+            </div>
+
+            <div class="scores">
+                <div class="score-section" id="player-score-section">
+                    <div><i class="fas fa-user"></i> Player</div>
+                    <div id="player-score" class="text-xl">0</div>
+                </div>
+                <div class="score-section" id="opponent-score-section">
+                    <div><i class="fas fa-robot"></i> Opponent</div>
+                    <div id="opponent-score" class="text-xl">0</div>
+                </div>
+                <div class="score-section">
+                    <div><i class="fas fa-dice"></i> Round Pts</div>
+                    <div id="round-score" class="text-xl">0</div>
+                </div>
+                 <div class="score-section">
+                    <div><i class="fas fa-check-circle"></i> Selected Pts</div>
+                    <div id="selected-score" class="text-xl">0</div>
+                </div>
+            </div>
+
+            <div class="message-box" id="message-area">Place your bet to start!</div>
+
+            <div class="dice-container" id="dice-container">
+                 </div>
+
+            <div class="button-container mt-4">
+                <button id="roll-button" disabled><i class="fas fa-dice-d6"></i> Roll Dice</button>
+                <button id="bank-button" disabled><i class="fas fa-piggy-bank"></i> Bank Score</button>
+            </div>
+             <button id="new-game-button" class="mt-4"><i class="fas fa-redo"></i> New Game (New Bet)</button>
+        </div>
+
+         <audio id="audio-player" class="hidden">
+             <source id="audio-source" src="" type="audio/mpeg">
+             Your browser does not support the audio element.
+         </audio>
+    </div>
+
+    <script>
+        // --- Game Configuration Constants ---
+        const NUM_DICE = 6;
+        const MIN_OPENING_SCORE = 500; // Still relevant for AI logic
+        const HOT_DICE_BONUS = 500;
+        const STARTING_CREDITS = 1000;
+        const MIN_BET = 10;
+        // Base AI Parameters (will be adjusted by personality)
+        const BASE_AI_BANK_THRESHOLD = 400;
+        const BASE_AI_RISK_FACTOR = 0.5; // 0 = safe, 1 = risky
+        const BUST_DELAY = 1500;
+        const AI_ACTION_DELAY = 1400;
+        const AI_START_DELAY = 1200;
+        const ANIMATION_DURATION = 500;
+        const LOCAL_STORAGE_KEY = 'farkleFunPlayerCredits_v2';
+
+        // --- Approximate Farkle Probabilities (Chance of NOT scoring) ---
+        const farkleProbabilities = {
+            1: 4/6,    // ~66.7%
+            2: 16/36,  // ~44.4%
+            3: 0.157,  // ~15.7% (Approximation based on simulations/tables)
+            4: 0.065,  // ~6.5%
+            5: 0.023,  // ~2.3%
+            6: 0.008   // ~0.8%
+        };
+
+        // --- Game State Variables ---
+        let currentGameTargetScore = 10000;
+        let playerTotalScore = 0, opponentTotalScore = 0, playerCredits = 0, opponentCredits = 0,
+            currentBet = 0, currentRoundScore = 0, selectedDiceInfo = { dice: [], score: 0, combo: "" },
+            currentDiceValues = [], heldDiceIndices = [], diceAvailableToRoll = NUM_DICE,
+            isPlayerTurn = true, turnJustStarted = true, gameOver = false,
+            canPlayerBank = false, canOpponentBank = false, scoreableDiceIndices = [];
+        let aiPersonality = 'Balanced'; // Default AI personality
+
+        // --- DOM Element References ---
+        let playerScoreEl, opponentScoreEl, playerCreditsEl, opponentCreditsEl, currentBetEl,
+            roundScoreEl, selectedScoreEl, goalScoreEl, diceContainer, rollButton, bankButton,
+            newGameButton, messageArea, playerScoreSection, opponentScoreSection, bettingOverlay,
+            betAmountInput, startGameButton, availableCreditsEl, betErrorEl, resetCreditsButton,
+            mainGameArea, audioPlayer, audioSource, instructionsOverlay, closeInstructionsButton,
+            targetScoreSelect;
+
+        function getElementReferences() {
+            playerScoreEl = document.getElementById('player-score');
+            opponentScoreEl = document.getElementById('opponent-score');
+            playerCreditsEl = document.getElementById('player-credits');
+            opponentCreditsEl = document.getElementById('opponent-credits');
+            currentBetEl = document.getElementById('current-bet');
+            roundScoreEl = document.getElementById('round-score');
+            selectedScoreEl = document.getElementById('selected-score');
+            goalScoreEl = document.getElementById('goal-score');
+            diceContainer = document.getElementById('dice-container');
+            rollButton = document.getElementById('roll-button');
+            bankButton = document.getElementById('bank-button');
+            newGameButton = document.getElementById('new-game-button');
+            messageArea = document.getElementById('message-area');
+            playerScoreSection = document.getElementById('player-score-section');
+            opponentScoreSection = document.getElementById('opponent-score-section');
+            bettingOverlay = document.getElementById('betting-overlay');
+            betAmountInput = document.getElementById('bet-amount');
+            startGameButton = document.getElementById('start-game-button');
+            availableCreditsEl = document.getElementById('available-credits');
+            betErrorEl = document.getElementById('bet-error');
+            resetCreditsButton = document.getElementById('reset-credits-button');
+            mainGameArea = document.getElementById('main-game-area');
+            audioPlayer = document.getElementById('audio-player');
+            audioSource = document.getElementById('audio-source');
+            instructionsOverlay = document.getElementById('instructions-overlay');
+            closeInstructionsButton = document.getElementById('close-instructions-button');
+            targetScoreSelect = document.getElementById('target-score-select');
+        }
+
+
+        // --- Audio Files (Base64 Encoded WAV Placeholders) ---
+        const sounds = {
+            roll: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEARKwAAIhYAQAACABhZHJlZXRlZCBieSBzb3VuZCBmb3JnZS5jb20=',
+            select: 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEARKwAAIhYAQAACABhZHJlc2V0ZSBieSBzb3VuZCBmb3JnZS5jb20=',
+            bank: 'data:audio/wav;base64,UklGRkFvT19XQVZFZm10IBAAAAABAAEARKwAAIhYAQAACABkYXRhgDsAAAC4/v/9/v7+////zv79/v79/v78/vr+9/3u+9/3u+9v3u+97w==',
+            farkle: 'data:audio/wav;base64,UklGRkBvT19XQVZFZm10IBAAAAABAAEARKwAAIhYAQAACABkYXRhQDkAAAD7+/7+/v7+/v35+fXz8u7r6+vm5eLc2djX09PPyMfDu7uxr6mnf354bmlpZWVhXVtZWkpJR0RDPz49Ozo5ODQxMCsnJikoKCcmJQ==',
+            win: 'data:audio/wav;base64,UklGRohvT19XQVZFZm10IBAAAAABAAEARKwAAIhYAQAACABkYXRhf28AAABAAAAAQEBAQUFBQkJCQ0NERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9foCBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMXGx8jJysvMzc7P0NHS09TV1tfY2drb3N3e3+Dh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/AAAAAA==',
+            hotdice: 'data:audio/wav;base64,UklGRlFvT19XQVZFZm10IBAAAAABAAEARKwAAIhYAQAACABkYXRhQW8AAAD///////z8/Pv7+vf39fX18/Ly7u7u6Ojo5ubm4uLi3Nzc2tra1tbW0tLSz8/Px8fHwsLCvb29u7u7srKysbGxrq6urq6uqampoaGhgYGBfX19e3t7dnZ2c3NzcXFxbW1tampqaGhoaGdnZ2VlZWRkZGBgYF9fX15eXlxcXFtbW1paWllZWVhYWFhYWFlZWVlZWVhYWFlZWQ=='
+        };
+
+        // --- Play Audio Function ---
+        function playAudio(soundName) {
+            if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+                 if (sounds[soundName] && audioPlayer && audioSource) {
+                    audioSource.src = sounds[soundName];
+                    audioPlayer.load();
+                    audioPlayer.play().catch(e => console.warn("Audio play failed:", e));
+                } else if (!sounds[soundName]){
+                    console.warn(`Sound not found: ${soundName}`);
+                }
+            } else {
+                 console.warn("AudioContext not supported by this browser.");
+            }
+        }
+
+        // --- SVG Dice Faces (1 to 6) ---
+        const diceSVGs = {
+            1: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="12" class="pip"/></svg>`,
+            2: `<svg viewBox="0 0 100 100"><circle cx="28" cy="28" r="12" class="pip"/><circle cx="72" cy="72" r="12" class="pip"/></svg>`,
+            3: `<svg viewBox="0 0 100 100"><circle cx="28" cy="28" r="12" class="pip"/><circle cx="50" cy="50" r="12" class="pip"/><circle cx="72" cy="72" r="12" class="pip"/></svg>`,
+            4: `<svg viewBox="0 0 100 100"><circle cx="28" cy="28" r="12" class="pip"/><circle cx="72" cy="28" r="12" class="pip"/><circle cx="28" cy="72" r="12" class="pip"/><circle cx="72" cy="72" r="12" class="pip"/></svg>`,
+            5: `<svg viewBox="0 0 100 100"><circle cx="28" cy="28" r="12" class="pip"/><circle cx="72" cy="28" r="12" class="pip"/><circle cx="50" cy="50" r="12" class="pip"/><circle cx="28" cy="72" r="12" class="pip"/><circle cx="72" cy="72" r="12" class="pip"/></svg>`,
+            6: `<svg viewBox="0 0 100 100"><circle cx="28" cy="28" r="12" class="pip"/><circle cx="72" cy="28" r="12" class="pip"/><circle cx="28" cy="50" r="12" class="pip"/><circle cx="72" cy="50" r="12" class="pip"/><circle cx="28" cy="72" r="12" class="pip"/><circle cx="72" cy="72" r="12" class="pip"/></svg>`
+        };
+
+        // --- Credit Management Functions ---
+        function saveCredits() { try { localStorage.setItem(LOCAL_STORAGE_KEY, playerCredits.toString()); } catch (e) { console.error("Failed to save credits:", e); } }
+        function loadCredits() {
+            try { const saved = localStorage.getItem(LOCAL_STORAGE_KEY); playerCredits = saved !== null ? parseInt(saved) : STARTING_CREDITS; } catch (e) { console.error("Failed to load credits:", e); playerCredits = STARTING_CREDITS; }
+            opponentCredits = STARTING_CREDITS;
+            if (isNaN(playerCredits) || playerCredits < 0) playerCredits = STARTING_CREDITS;
+            if (isNaN(opponentCredits)) opponentCredits = STARTING_CREDITS;
+            updateCreditDisplay();
+        }
+         function updateCreditDisplay() {
+             if (playerCreditsEl) playerCreditsEl.textContent = playerCredits;
+             if (opponentCreditsEl) opponentCreditsEl.textContent = opponentCredits;
+             if (currentBetEl) currentBetEl.textContent = currentBet;
+             if (availableCreditsEl) availableCreditsEl.textContent = playerCredits;
+         }
+
+        // --- AI Personality ---
+        function selectAiPersonality() {
+            const personalities = ['Cautious', 'Balanced', 'Risky'];
+            aiPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+            console.log("AI Personality Selected:", aiPersonality); // Log for debugging
+        }
+
+        // --- Betting Flow Functions ---
+         function setupBetting() {
+             console.log("Setting up betting...");
+             loadCredits();
+             if (mainGameArea) mainGameArea.classList.add('hidden');
+             if (instructionsOverlay) instructionsOverlay.classList.add('hidden');
+             if (bettingOverlay) bettingOverlay.classList.remove('hidden');
+             if (betAmountInput) { betAmountInput.max = playerCredits; betAmountInput.value = Math.min(MIN_BET * 5, playerCredits, 50); betAmountInput.min = MIN_BET; }
+             if(betErrorEl) betErrorEl.textContent = '';
+             if(rollButton) rollButton.disabled = true;
+             if(bankButton) bankButton.disabled = true;
+             if(newGameButton) newGameButton.disabled = true;
+             if(messageArea) messageArea.textContent = "Choose score, place bet!";
+             playerTotalScore = 0; opponentTotalScore = 0; currentRoundScore = 0;
+             selectedDiceInfo = { dice: [], score: 0, combo: "" };
+             updateScores();
+             if(diceContainer) diceContainer.innerHTML = '';
+             highlightActivePlayer(false);
+         }
+
+         function handleStartGame() {
+             console.log("handleStartGame called");
+             if (!betAmountInput || !betErrorEl || !bettingOverlay || !mainGameArea || !newGameButton || !targetScoreSelect || !instructionsOverlay) {
+                 console.error("Required elements missing for handleStartGame!"); return;
+             }
+             const bet = parseInt(betAmountInput.value);
+             betErrorEl.textContent = '';
+             if (isNaN(bet) || bet < MIN_BET) { betErrorEl.textContent = `Bet must be at least ${MIN_BET}.`; return; }
+             if (bet > playerCredits) { betErrorEl.textContent = "Not enough credits!"; return; }
+             currentGameTargetScore = parseInt(targetScoreSelect.value);
+             if (isNaN(currentGameTargetScore)) { console.error("Invalid target score"); currentGameTargetScore = 10000; }
+
+             selectAiPersonality(); // Select AI personality for this game
+
+             console.log(`Bet accepted: ${bet}, Target Score: ${currentGameTargetScore}, AI: ${aiPersonality}`);
+             currentBet = bet; playerCredits -= bet; saveCredits(); updateCreditDisplay();
+             bettingOverlay.classList.add('hidden');
+             mainGameArea.classList.add('hidden');
+             instructionsOverlay.classList.remove('hidden'); // Show instructions
+             if(rollButton) rollButton.disabled = true;
+             if(bankButton) bankButton.disabled = true;
+             if(newGameButton) newGameButton.disabled = true;
+             console.log("Showing instructions...");
+         }
+
+         function handleCloseInstructions() {
+             console.log("Closing instructions and starting game init...");
+             if (instructionsOverlay) instructionsOverlay.classList.add('hidden');
+             if (mainGameArea) mainGameArea.classList.remove('hidden');
+             if (newGameButton) newGameButton.disabled = false;
+             initGame(); // Initialize game state *after* closing instructions
+         }
+
+         function handleResetCredits() {
+             if (!betAmountInput || !betErrorEl) { console.error("Required elements missing!"); return; }
+             playerCredits = STARTING_CREDITS; opponentCredits = STARTING_CREDITS; saveCredits(); updateCreditDisplay();
+             betAmountInput.max = playerCredits; betAmountInput.value = Math.min(MIN_BET * 5, playerCredits, 50);
+             betErrorEl.textContent = `Credits reset to ${STARTING_CREDITS}.`; playAudio('bank');
+         }
+
+        // --- Core Game Logic Functions ---
+        function initGame() {
+            console.log("--- INIT GAME ---");
+            if (!goalScoreEl || !rollButton || !bankButton || !messageArea) { console.error("Required elements missing!"); return; }
+            gameOver = false; playerTotalScore = 0; opponentTotalScore = 0; isPlayerTurn = true;
+            canPlayerBank = false; canOpponentBank = false;
+            goalScoreEl.textContent = currentGameTargetScore;
+            resetTurnState(); updateScores(); updateCreditDisplay();
+            displayMessage("Player's Turn. Roll the dice!");
+            rollButton.disabled = false;
+            bankButton.disabled = true;
+            highlightActivePlayer(true); renderDice();
+        }
+        function resetTurnState() {
+            currentRoundScore = 0; selectedDiceInfo = { dice: [], score: 0, combo: "" };
+            currentDiceValues = []; heldDiceIndices = []; diceAvailableToRoll = NUM_DICE;
+            turnJustStarted = true; scoreableDiceIndices = []; updateScores();
+        }
+        function updateScores() {
+             if(playerScoreEl) playerScoreEl.textContent = playerTotalScore;
+             if(opponentScoreEl) opponentScoreEl.textContent = opponentTotalScore;
+             if(roundScoreEl) roundScoreEl.textContent = currentRoundScore;
+             if(selectedScoreEl) selectedScoreEl.textContent = selectedDiceInfo.score;
+        }
+        function displayMessage(msg, isScoreUpdate = false) {
+            if (!messageArea) return;
+            messageArea.textContent = msg;
+            if(isScoreUpdate) {
+                messageArea.classList.remove('opacity-0'); messageArea.classList.add('opacity-0');
+                requestAnimationFrame(() => { setTimeout(() => messageArea.classList.remove('opacity-0'), 50); });
+            }
+        }
+        function highlightActivePlayer(isPlayer = null) {
+             if (!playerScoreSection || !opponentScoreSection) return;
+             const playerActive = isPlayer === null ? isPlayerTurn : isPlayer;
+             playerScoreSection.classList.toggle('active-player', playerActive);
+             opponentScoreSection.classList.toggle('active-player', !playerActive);
+        }
+        // --- Dice Roll Randomness ---
+        // Uses JavaScript's standard Math.random(), which is a pseudo-random number generator.
+        // It's suitable for games and generally unpredictable enough for this purpose.
+        function rollDiceValues(num) { return Array.from({ length: num }, () => Math.floor(Math.random() * 6) + 1); }
+
+        function animateAndRenderDice(rolledValues) {
+             if (!diceContainer) return;
+             playAudio('roll'); diceContainer.innerHTML = '';
+             const diceElements = rolledValues.map((value, index) => {
+                 const dieElement = document.createElement('div'); dieElement.classList.add('die', 'rolling');
+                 dieElement.innerHTML = diceSVGs[Math.floor(Math.random() * 6) + 1];
+                 dieElement.dataset.finalValue = value;
+                 if (currentDiceValues[index]) { dieElement.dataset.index = currentDiceValues[index].originalIndex; }
+                 else { console.error("Error: currentDiceValues missing index", index); dieElement.dataset.index = index; }
+                 diceContainer.appendChild(dieElement); return dieElement;
+             });
+             setTimeout(() => {
+                 diceElements.forEach((dieElement) => {
+                     const finalValue = parseInt(dieElement.dataset.finalValue);
+                     dieElement.innerHTML = diceSVGs[finalValue] || '?'; dieElement.classList.remove('rolling'); dieElement.dataset.value = finalValue;
+                 });
+                 renderDice(); // Render final state
+                 if (!hasScoringDice(currentDiceValues)) {
+                     console.log("Farkle detected!"); playAudio('farkle');
+                     displayMessage((isPlayerTurn ? "Player" : "Opponent") + " Farkled! Lost round points.", true);
+                     currentRoundScore = 0; setTimeout(() => endTurn(true), BUST_DELAY);
+                 } else {
+                     if (isPlayerTurn) {
+                         displayMessage("Select scoring dice.");
+                         if(rollButton) rollButton.disabled = true;
+                         if(bankButton) bankButton.disabled = true;
+                     } else { setTimeout(aiTakeTurn, AI_ACTION_DELAY / 2); }
+                 }
+             }, ANIMATION_DURATION);
+        }
+
+        // --- RENDER DICE (HIGHLIGHTING REMOVED) ---
+        function renderDice() {
+            if (!diceContainer) return; diceContainer.innerHTML = '';
+            if (heldDiceIndices.length > 0) {
+                 const heldContainer = document.createElement('div'); heldContainer.textContent = `(${heldDiceIndices.length} Held - Round: ${currentRoundScore})`;
+                 heldContainer.classList.add('held-placeholder', 'text-sm', 'w-full', 'mb-2', 'text-gray-400'); diceContainer.appendChild(heldContainer);
+             }
+            if (currentDiceValues.length > 0) {
+                currentDiceValues.forEach(dieInfo => {
+                    if (!dieInfo || typeof dieInfo.value === 'undefined' || typeof dieInfo.originalIndex === 'undefined') { console.error("Invalid dieInfo:", dieInfo); return; }
+                    const { value, originalIndex } = dieInfo; const dieElement = document.createElement('div'); dieElement.classList.add('die');
+                    dieElement.innerHTML = diceSVGs[value] || '?'; dieElement.dataset.index = originalIndex; dieElement.dataset.value = value;
+                    const isSelected = selectedDiceInfo.dice.some(d => d.originalIndex === originalIndex);
+                    dieElement.classList.toggle('selected', isSelected);
+                    dieElement.removeEventListener('click', handleDieClick);
+                    if (isPlayerTurn && !gameOver && !turnJustStarted) {
+                        dieElement.style.cursor = 'pointer';
+                        dieElement.addEventListener('click', handleDieClick);
+                    } else {
+                        dieElement.style.cursor = 'default';
+                    }
+                    diceContainer.appendChild(dieElement);
+                });
+            } else if (turnJustStarted && diceAvailableToRoll > 0) {
+                 for(let i = 0; i < diceAvailableToRoll; i++) {
+                     const dieElement = document.createElement('div'); dieElement.classList.add('die', 'opacity-50');
+                     dieElement.innerHTML = '?'; dieElement.style.fontSize = '2rem'; dieElement.style.color = '#aaa'; dieElement.style.cursor = 'default';
+                     diceContainer.appendChild(dieElement);
+                 }
+            }
+        }
+
+        // --- HANDLE DIE CLICK (LOGIC ADJUSTED FOR FLEXIBLE BANKING) ---
+        function handleDieClick(event) {
+            if (gameOver || !isPlayerTurn || turnJustStarted || !rollButton || !bankButton) return;
+            const dieElement = event.currentTarget; const originalIndex = parseInt(dieElement.dataset.index); const value = parseInt(dieElement.dataset.value);
+            playAudio('select');
+            const existingSelectionIndex = selectedDiceInfo.dice.findIndex(d => d.originalIndex === originalIndex);
+            if (existingSelectionIndex > -1) { selectedDiceInfo.dice.splice(existingSelectionIndex, 1); }
+            else { const dieData = currentDiceValues.find(d => d.originalIndex === originalIndex); if (dieData) { selectedDiceInfo.dice.push({ ...dieData }); } else { console.error("Die data not found:", originalIndex); } }
+
+            const currentSelectionValues = selectedDiceInfo.dice.map(d => d.value);
+            // *** Check if the *selected subset* forms a valid score ***
+            const { score: selectionScore, combo: selectionCombo, usedDiceIndices: usedInSelection } = calculateScore(currentSelectionValues);
+            // A selection is valid if it scores points AND uses all the dice *the player selected*
+            const isValidSelection = selectionScore > 0 && usedInSelection.length === selectedDiceInfo.dice.length;
+
+            // console.log(`Die Click - isValidSelection: ${isValidSelection}, selectionScore: ${selectionScore}`);
+
+            if (isValidSelection) {
+                selectedDiceInfo.score = selectionScore; selectedDiceInfo.combo = selectionCombo; displayMessage(`Selected: ${selectionCombo} (${selectionScore} pts)`);
+                // *** Bank button is enabled if the selection is valid ***
+                bankButton.disabled = false;
+                rollButton.disabled = false; // Enable roll if selection is valid
+                // console.log(`Die Click - Enabling Bank & Roll buttons.`);
+            } else {
+                // Selection is currently invalid
+                selectedDiceInfo.score = 0; selectedDiceInfo.combo = "";
+                if (selectedDiceInfo.dice.length > 0) { displayMessage("Invalid selection. Select a valid scoring combo."); }
+                else { displayMessage("Select scoring dice."); }
+                bankButton.disabled = true; // Disable bank if selection invalid
+                rollButton.disabled = true; // Disable roll if selection invalid
+                // console.log(`Die Click - Disabling Bank & Roll buttons.`);
+            }
+            updateScores(); renderDice();
+        }
+
+        // --- CALCULATE SCORE (SMALL STRAIGHTS ADDED) ---
+        function calculateScore(diceValues) {
+            let score = 0; let comboParts = []; const counts = {}; diceValues.forEach(d => counts[d] = (counts[d] || 0) + 1);
+            const n = diceValues.length; const used = Array(n).fill(false); const usedDiceIndicesOutput = [];
+            const markUsed = (value, countToMark) => { let marked = 0; for (let i = 0; i < n; i++) { if (marked >= countToMark) break; if (!used[i] && diceValues[i] === value) { used[i] = true; usedDiceIndicesOutput.push(i); marked++; } } };
+
+            // --- Scoring Logic (Prioritized) ---
+
+            // 1. Six of a kind
+            for (let v = 1; v <= 6; v++) { if (counts[v] === 6) { score += 3000; comboParts.push(`Six ${v}s`); markUsed(v, 6); counts[v] = 0; break; } }
+
+            // 2. Large Straight (1-6)
+             if (n === 6 && !used.some(u => u) && [1,2,3,4,5,6].every(v => counts[v] === 1)) {
+                 score += 1500; comboParts.push("Straight (1-6)");
+                 [1,2,3,4,5,6].forEach(v => { markUsed(v, 1); counts[v] = 0; });
+             }
+
+            // 3. Small Straights (1-5 or 2-6) - Check only if not already used
+             if (n >= 5 && !used.some(u => u)) {
+                 const uniqueVals = new Set(diceValues.filter((_, i) => !used[i])); // Consider only unused dice for straight check
+                 const has1to5 = [1,2,3,4,5].every(v => uniqueVals.has(v));
+                 const has2to6 = [2,3,4,5,6].every(v => uniqueVals.has(v));
+
+                 if (has1to5) {
+                     score += 750; comboParts.push("Small Straight (1-5)");
+                     [1,2,3,4,5].forEach(v => { markUsed(v, 1); counts[v] -= 1; }); // Mark one of each used
+                 } else if (has2to6) {
+                     score += 750; comboParts.push("Small Straight (2-6)");
+                     [2,3,4,5,6].forEach(v => { markUsed(v, 1); counts[v] -= 1; }); // Mark one of each used
+                 }
+             }
+
+            // 4. Three Pairs - Check only if not already used and exactly 6 dice
+             if (n === 6 && !used.some(u => u)) {
+                 const currentCounts = {}; // Recalculate counts for remaining dice
+                 diceValues.forEach((val, i) => { if (!used[i]) currentCounts[val] = (currentCounts[val] || 0) + 1; });
+                 const pairs = Object.values(currentCounts).filter(c => c === 2).length;
+                 if (pairs === 3) {
+                     score += 1500; comboParts.push("Three Pairs");
+                     Object.keys(currentCounts).filter(v => currentCounts[v] === 2).forEach(v => { markUsed(parseInt(v), 2); counts[parseInt(v)] = 0; });
+                 }
+             }
+
+             // 5. Two Triplets - Check only if not already used and exactly 6 dice
+            if (n === 6 && !used.some(u => u)) {
+                 const currentCounts = {}; // Recalculate counts
+                 diceValues.forEach((val, i) => { if (!used[i]) currentCounts[val] = (currentCounts[val] || 0) + 1; });
+                 const triplets = Object.values(currentCounts).filter(c => c === 3).length;
+                 if (triplets === 2) {
+                     score += 2500; comboParts.push("Two Triplets");
+                     Object.keys(currentCounts).filter(v => currentCounts[v] === 3).forEach(v => { markUsed(parseInt(v), 3); counts[parseInt(v)] = 0; });
+                 }
+            }
+
+            // 6. Five of a kind
+            for (let v = 1; v <= 6; v++) { if (counts[v] === 5) { score += 2000; comboParts.push(`Five ${v}s`); markUsed(v, 5); counts[v] = 0; break; } }
+
+            // 7. Four of a kind
+            for (let v = 1; v <= 6; v++) { if (counts[v] === 4) { score += 1000; comboParts.push(`Four ${v}s`); markUsed(v, 4); counts[v] = 0; break; } }
+
+            // 8. Three of a kind (Handle 1s separately)
+             if (counts[1] >= 3) { score += 1000; comboParts.push("Three 1s"); markUsed(1, 3); counts[1] -= 3; }
+            for (let v = 2; v <= 6; v++) { if (counts[v] >= 3) { score += v * 100; comboParts.push(`Three ${v}s`); markUsed(v, 3); counts[v] -= 3; } }
+
+            // 9. Single 1s (remaining)
+            if (counts[1] > 0) { score += counts[1] * 100; comboParts.push(`${counts[1]}x One(s)`); markUsed(1, counts[1]); counts[1] = 0;}
+
+            // 10. Single 5s (remaining)
+            if (counts[5] > 0) { score += counts[5] * 50; comboParts.push(`${counts[5]}x Five(s)`); markUsed(5, counts[5]); counts[5] = 0; }
+
+            const uniqueUsedIndices = [...new Set(usedDiceIndicesOutput)];
+            return { score, combo: comboParts.join(', ') || "No Score", usedDiceIndices: uniqueUsedIndices };
+        }
+        function hasScoringDice(diceData) { if (!diceData || diceData.length === 0) return false; const values = diceData.map(d => d.value); const { score } = calculateScore(values); return score > 0; }
+        function findScoreableDiceIndices(diceData) { // Kept for potential AI use
+            const scoreableIndices = new Set(); if (!diceData || diceData.length === 0) return []; const n = diceData.length;
+            for (let i = 1; i < (1 << n); i++) { let subsetValues = []; let subsetOriginalIndices = [];
+                for (let j = 0; j < n; j++) { if ((i >> j) & 1) { if (diceData[j] && typeof diceData[j].value !== 'undefined' && typeof diceData[j].originalIndex !== 'undefined') { subsetValues.push(diceData[j].value); subsetOriginalIndices.push(diceData[j].originalIndex); } else { console.error("Invalid dice data:", diceData[j]); } } }
+                if (subsetValues.length > 0) { const { score, usedDiceIndices: used } = calculateScore(subsetValues); if (score > 0 && used.length === subsetValues.length) { subsetOriginalIndices.forEach(idx => scoreableIndices.add(idx)); } }
+            } return Array.from(scoreableIndices);
+        }
+
+        // --- Button Action Handlers ---
+        function handleRoll() {
+            if (gameOver || !rollButton || !bankButton) return; rollButton.disabled = true; bankButton.disabled = true;
+            if (turnJustStarted) {
+                const values = rollDiceValues(NUM_DICE); currentDiceValues = values.map((v, i) => ({ value: v, originalIndex: i }));
+                diceAvailableToRoll = NUM_DICE; heldDiceIndices = []; currentRoundScore = 0; selectedDiceInfo = { dice: [], score: 0, combo: "" }; turnJustStarted = false;
+                displayMessage((isPlayerTurn ? "Player" : "Opponent") + " rolled."); animateAndRenderDice(values);
+            } else {
+                const selVals = selectedDiceInfo.dice.map(d => d.value); const { score: selScore, usedDiceIndices: used } = calculateScore(selVals);
+                const isValid = selectedDiceInfo.dice.length > 0 && used.length === selectedDiceInfo.dice.length && selScore > 0;
+                if (!isValid) { displayMessage("Invalid selection to roll again."); rollButton.disabled = true; bankButton.disabled = true; renderDice(); return; }
+
+                currentRoundScore += selScore;
+                const newHeld = selectedDiceInfo.dice.map(d => d.originalIndex); heldDiceIndices.push(...newHeld);
+                diceAvailableToRoll = NUM_DICE - heldDiceIndices.length; let hotDice = false;
+                if (diceAvailableToRoll <= 0) { hotDice = true; playAudio('hotdice'); displayMessage("Hot dice!", true); currentRoundScore += HOT_DICE_BONUS; diceAvailableToRoll = NUM_DICE; heldDiceIndices = []; }
+                const newRolls = rollDiceValues(diceAvailableToRoll); currentDiceValues = newRolls.map((v, i) => ({ value: v, originalIndex: i }));
+                selectedDiceInfo = { dice: [], score: 0, combo: "" }; scoreableDiceIndices = [];
+                const msg = (isPlayerTurn ? "Player" : "Opponent") + ` rolled ${diceAvailableToRoll}` + (hotDice ? ` (+${HOT_DICE_BONUS} bonus!)` : ""); displayMessage(msg); animateAndRenderDice(newRolls);
+            } updateScores();
+        }
+
+        // --- HANDLE BANK (LOGIC REVISED FOR FLEXIBLE BANKING + MIN SCORE REMOVED) ---
+        function handleBank() {
+            // console.log("handleBank called"); // Keep console clean
+            if (gameOver || !isPlayerTurn || !bankButton || !rollButton) return;
+
+            // 1. Calculate score of the *currently selected dice*
+             const currentSelectionValues = selectedDiceInfo.dice.map(d => d.value);
+             const { score: finalSelectionScore, combo: finalCombo, usedDiceIndices: usedInFinalSelection } = calculateScore(currentSelectionValues);
+             // *** Validation for Bank: Selection must score points and use all selected dice ***
+             const isValidFinalSelection = finalSelectionScore > 0 && usedInFinalSelection.length === selectedDiceInfo.dice.length;
+
+             // console.log(`Bank Check 1 - isValidFinalSelection: ${isValidFinalSelection}, finalSelectionScore: ${finalSelectionScore}`); // Keep console clean
+
+             if (!isValidFinalSelection) {
+                 displayMessage("Invalid selection. Select a valid scoring combo to bank.");
+                 bankButton.disabled = true; // Keep bank disabled
+                 return;
+             }
+
+            // 2. Calculate the total score for the round *if* this selection is banked
+            const totalScoreToBank = currentRoundScore + finalSelectionScore;
+            // console.log(`Bank Check 2 - currentRoundScore: ${currentRoundScore}, finalSelectionScore: ${finalSelectionScore}, totalToBank: ${totalScoreToBank}`); // Keep console clean
+
+             // 3. *** REMOVED Minimum Opening Score Check ***
+
+            // --- Banking is valid ---
+            // console.log(`Bank Check 4 - Banking ${totalScoreToBank} points.`); // Keep console clean
+            playAudio('bank');
+            canPlayerBank = true; // Mark player as having banked (still useful for potential future rules)
+            playerTotalScore += totalScoreToBank; // Add the full round score to total
+            displayMessage(`Player banked ${totalScoreToBank} points (Last: ${finalCombo}). Total: ${playerTotalScore}`, true);
+            updateScores();
+
+            if (playerTotalScore >= currentGameTargetScore) {
+                endGame();
+            } else {
+                endTurn(false); // End turn normally
+            }
+        }
+
+        function endTurn(isFarkle) {
+             console.log(`--- END TURN --- Farkle: ${isFarkle}, Player Turn Before Switch: ${isPlayerTurn}`); // Add logging
+            if (gameOver || !rollButton || !bankButton) return;
+
+            // Ensure AI doesn't get stuck if its turn ended abruptly
+             if (!isPlayerTurn && isFarkle) {
+                 console.log("AI Farkled, ensuring turn ends cleanly.");
+             } else if (!isPlayerTurn && !isFarkle) {
+                  console.log("AI Banked, ensuring turn ends cleanly.");
+             }
+
+
+            if (isFarkle) { currentRoundScore = 0; updateScores(); }
+            isPlayerTurn = !isPlayerTurn; // Switch turn
+            console.log(`Turn Switched. isPlayerTurn is now: ${isPlayerTurn}`);
+            resetTurnState(); highlightActivePlayer();
+            if (isPlayerTurn) {
+                displayMessage("Player's Turn.");
+                rollButton.disabled = false; bankButton.disabled = true; renderDice();
+            } else {
+                displayMessage("Opponent's Turn...");
+                rollButton.disabled = true; bankButton.disabled = true; renderDice();
+                console.log(`Scheduling AI turn (aiTakeTurn) in ${AI_START_DELAY}ms`);
+                setTimeout(aiTakeTurn, AI_START_DELAY);
+            }
+        }
+        function endGame() {
+            console.log("--- GAME OVER ---"); if (!rollButton || !bankButton || !newGameButton) return;
+            gameOver = true; rollButton.disabled = true; bankButton.disabled = true; newGameButton.disabled = false;
+            let winner = "?"; let msg = "";
+            const pWin = playerTotalScore >= currentGameTargetScore && playerTotalScore >= opponentTotalScore;
+            const oWin = opponentTotalScore >= currentGameTargetScore && opponentTotalScore > playerTotalScore;
+            if (pWin) { winner = "Player"; const winnings = currentBet * 2; playerCredits += winnings; msg = `Player wins ${winnings} credits!`; playAudio('win'); }
+            else if (oWin) { winner = "Opponent"; msg = `Opponent wins! Player loses ${currentBet} credits.`; playAudio('farkle'); }
+            else if (playerTotalScore >= currentGameTargetScore && opponentTotalScore >= currentGameTargetScore && playerTotalScore === opponentTotalScore) { winner = "Tie"; playerCredits += currentBet; msg = `Tie! Bet returned.`; playAudio('bank'); }
+            else { msg = "Game Over!"; if(playerTotalScore > opponentTotalScore) winner = "Player"; else winner="Opponent"; }
+            displayMessage(`Game Over! ${winner} wins! Score: P ${playerTotalScore}-O ${opponentTotalScore}. ${msg}`, true);
+            saveCredits(); updateCreditDisplay(); highlightActivePlayer(false); currentBet = 0; if(currentBetEl) currentBetEl.textContent = currentBet;
+        }
+
+        // --- AI Opponent Logic (with Personalities & Probability) ---
+        function aiTakeTurn() {
+            console.log(`--- AI TURN START/CONTINUE (${aiPersonality}) ---`);
+            if (gameOver || isPlayerTurn) {
+                 console.log("AI Turn aborted (Game Over or Not AI Turn).");
+                 return;
+            }
+            // Check if it's still AI's turn (safety check against race conditions)
+             if (isPlayerTurn) {
+                 console.error("AI attempted action but it's Player's turn!");
+                 return;
+             }
+
+            if (turnJustStarted) { handleRoll(); return; }
+
+            // Determine AI parameters based on personality
+            let currentBankThreshold = BASE_AI_BANK_THRESHOLD;
+            let currentRiskFactor = BASE_AI_RISK_FACTOR; // Lower value = less risky for probability check
+            let personalityProbAdjust = 0; // How much personality adjusts the Farkle prob threshold
+            switch (aiPersonality) {
+                case 'Cautious':
+                    currentBankThreshold = BASE_AI_BANK_THRESHOLD * 0.75; // ~300
+                    personalityProbAdjust = -0.15; // Cautious banks even if prob is slightly lower
+                    break;
+                case 'Risky':
+                    currentBankThreshold = BASE_AI_BANK_THRESHOLD * 1.5; // ~600
+                    personalityProbAdjust = 0.20; // Risky tolerates higher Farkle probability
+                    break;
+                case 'Balanced':
+                default:
+                    // Use base values
+                    break;
+            }
+            console.log(`AI Params - Threshold: ${currentBankThreshold}, ProbAdjust: ${personalityProbAdjust}`);
+
+
+            const aiVals = currentDiceValues.map(d => d.value);
+            const { score: potScore, combo: potCombo, usedDiceIndices: relIdx } = calculateScore(aiVals);
+
+            if (potScore === 0) { console.error("AI Farkle fallback - Should have been caught earlier."); setTimeout(() => endTurn(true), BUST_DELAY); return; }
+
+            const selIdx = relIdx.map(i => currentDiceValues[i].originalIndex);
+            selectedDiceInfo = { dice: currentDiceValues.filter(d => selIdx.includes(d.originalIndex)), score: potScore, combo: potCombo };
+            updateScores(); renderDice(); // AI selection is shown briefly
+
+            const totalPot = currentRoundScore + selectedDiceInfo.score;
+            const numSel = selectedDiceInfo.dice.length;
+            let diceLeft = currentDiceValues.length - numSel;
+            const meetsReq = canOpponentBank || totalPot >= MIN_OPENING_SCORE;
+            const numRollNext = (diceLeft <= 0) ? NUM_DICE : diceLeft;
+
+            // --- AI Decision Logic using Personality & Probability ---
+            const mustRoll = !meetsReq; // Must roll if haven't opened banking
+            const bankThresh = meetsReq && totalPot >= currentBankThreshold; // Bank if score high enough
+
+            // Probability Check
+            const farkleProb = farkleProbabilities[numRollNext] || 0; // Get probability, default 0 if key invalid
+            const baseProbThreshold = 0.35; // Base probability threshold to bank (e.g., 35%)
+            const adjustedProbThreshold = Math.max(0.05, Math.min(0.95, baseProbThreshold + personalityProbAdjust)); // Adjust based on personality
+            const bankProbability = meetsReq && farkleProb > adjustedProbThreshold; // Bank if Farkle chance too high for personality
+
+            let hotDiceDec = null;
+            if (diceLeft <= 0 && meetsReq) {
+                 // If score is high, bank. Otherwise, risk based on probability threshold.
+                 hotDiceDec = (totalPot > currentBankThreshold * 1.5 || (farkleProbabilities[6] || 0) > adjustedProbThreshold) ? "Bank" : "Roll";
+            }
+
+            let decision = "Roll"; // Default
+            if (mustRoll) { decision = "Must Roll"; }
+            else if (hotDiceDec === "Bank") { decision = "Bank"; }
+            else if (hotDiceDec === "Roll") { decision = "Roll"; } // Explicitly roll on hot dice if not banking
+            else if (bankThresh || bankProbability) { decision = "Bank"; } // Combine reasons to bank
+
+            console.log(`AI Decision (${aiPersonality}): ${decision} (TotalPot: ${totalPot}, MeetsReq: ${meetsReq}, ThreshMet: ${bankThresh}, FarkleProb: ${farkleProb.toFixed(3)}, AdjProbThr: ${adjustedProbThreshold.toFixed(2)}, BankProb: ${bankProbability}, Hot: ${hotDiceDec})`);
+
+            // Execute AI action after delay
+            setTimeout(() => {
+                // Final check: Is it still the AI's turn?
+                if (gameOver || isPlayerTurn) {
+                    console.log("AI Action aborted - Turn changed before execution timeout.");
+                    return;
+                }
+
+                if (decision.startsWith("Bank")) {
+                    console.log("AI Banking...");
+                    playAudio('bank');
+                    currentRoundScore += selectedDiceInfo.score; // Add final selection before banking total
+                    opponentTotalScore += currentRoundScore;
+                    canOpponentBank = true; updateScores();
+                    displayMessage(`AI banked ${currentRoundScore}. Total: ${opponentTotalScore}`, true);
+                    if (opponentTotalScore >= currentGameTargetScore) {
+                        endGame();
+                    } else {
+                        endTurn(false); // End turn AFTER banking
+                    }
+                } else { // Roll Again or Must Roll
+                     console.log("AI Rolling again...");
+                    const msg = `AI rolls ${numRollNext} dice` + (hotDiceDec === "Roll" ? " (Hot Dice!)" : "");
+                    displayMessage(msg);
+                    handleRoll(); // Trigger the next roll for AI
+                }
+            }, AI_ACTION_DELAY);
+        }
+
+        // --- Event Listeners Setup ---
+        document.addEventListener('DOMContentLoaded', (event) => {
+            getElementReferences(); // Get references after DOM is ready
+            // Attach listeners only if elements exist
+            if(rollButton) rollButton.addEventListener('click', handleRoll); else console.error("Roll button not found");
+            if(bankButton) bankButton.addEventListener('click', handleBank); else console.error("Bank button not found");
+            if(newGameButton) newGameButton.addEventListener('click', setupBetting); else console.error("New Game button not found");
+            if(startGameButton) startGameButton.addEventListener('click', handleStartGame); else console.error("Start Game button not found");
+            if(resetCreditsButton) resetCreditsButton.addEventListener('click', handleResetCredits); else console.error("Reset Credits button not found");
+            if(closeInstructionsButton) closeInstructionsButton.addEventListener('click', handleCloseInstructions); else console.error("Close Instructions button not found");
+
+            // Initial setup
+            setupBetting();
+        });
+
+    </script>
+</body>
+</html>
